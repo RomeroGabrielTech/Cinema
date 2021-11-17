@@ -1,8 +1,11 @@
 package com.vinntech.cinematrailer.service;
 
+import com.vinntech.cinematrailer.exception.FileNotFoundException;
+import com.vinntech.cinematrailer.exception.StorageException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,6 +19,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
+@Service
 public class FileSystemStorageService implements StorageService{
 
     @Value("${storage.location}")
@@ -27,7 +31,7 @@ public class FileSystemStorageService implements StorageService{
         try{
             Files.createDirectories(Paths.get(storageLocation));
         }catch (IOException e){
-            throw new RuntimeException("Error al inicializar la ubicación del almacén de archivos.");
+            throw new StorageException("Error al inicializar la ubicación del almacén de archivos.");
         }
 
     }
@@ -37,14 +41,14 @@ public class FileSystemStorageService implements StorageService{
         String filename =file.getOriginalFilename();
 
         if(file.isEmpty()){
-            throw new RuntimeException("No se puede almacenar un archivo vacio.");
+            throw new StorageException("No se puede almacenar un archivo vacio.");
         }
 
         try{
             InputStream inputStream = file.getInputStream();
             Files.copy(inputStream, Paths.get(storageLocation).resolve(filename), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e){
-            throw new RuntimeException("Error al almacenar el archivo " + filename, e);
+            throw new StorageException("Error al almacenar el archivo " + filename, e);
         }
         return filename;
     }
@@ -54,14 +58,20 @@ public class FileSystemStorageService implements StorageService{
         return Paths.get(storageLocation).resolve(filename);
     }
 
+
+
     @Override
-    public Resource loadResource(String filename) {
+    public Resource loadAsResource(String filename) {
         try{
             Path file = load(filename);
             Resource resource = new UrlResource(file.toUri());
-            if (resource.exists() ||)
+            if (resource.exists() || resource.isReadable()){
+                return resource;
+            }else{
+                throw new FileNotFoundException("No se pudo encontrar el archivo: " + filename);
+            }
         } catch (MalformedURLException e){
-            throw new RuntimeException("No se pudo encontrar el archivo: " + filename, e);
+            throw new FileNotFoundException("No se pudo encontrar el archivo: " + filename, e);
         }
 
     }
